@@ -2,23 +2,31 @@ version: '2'
 services:
   web:
     build: .
+    restart: always
 #    ports:
 #      - "5000:5000"
     environment:
+      - CLIENT_ID=xyRirRqBSbJI7MQ66hplTLoWsNHwsz
       - REDIS_HOST=redis
       - RABBIT_URL=amqp://guest@queue//
+    volumes:
+      - /data/mounted/online_doodle_files:/usr/src/app/online_doodle_files
   queue:
     image: rabbitmq
+    restart: always
     hostname: "rabbit_queue"
     ports:
       - "5672:5672"
   nginx:
     build: ./custom_nginx
+    restart: always
     ports:
-      - "8099:80"
+      - "80:80"
   redis:
     image: redis
     restart: always
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
+    volumes:
+      - /data/mounted/redis_data:/data

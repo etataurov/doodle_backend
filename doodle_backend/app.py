@@ -14,11 +14,11 @@ redis_host = os.environ.get("REDIS_HOST", "localhost")
 redis_client = Redis(redis_host)
 
 app = flask.Flask(__name__)
-app.config["OAUTH2_PROVIDER_TOKEN_EXPIRES_IN"] = 36000000000
+app.config["OAUTH2_PROVIDER_TOKEN_EXPIRES_IN"] = 3600000
 oauth = OAuth2Provider(app)
 
 cwd = os.path.abspath(os.path.dirname(__file__))
-SAMPLES_FOLDER = os.path.join(cwd, "online_doodle_files")
+SAMPLES_FOLDER = os.path.join(cwd, "../online_doodle_files")
 
 # allow requests only with this token provided
 
@@ -42,13 +42,13 @@ STYLES = {
         "model": "pretrained/starry_night.t7",
         "name": "Van Gogh"
     },
-    "agay_bay": {
-        "original": "agay-bay-1910.jpg",
-        "annotation": "agay-bay-1910-mask.jpegg",
-        "colors": "data/agay_bay/gen_doodles.hdf5_colors.npy",
-        "model": "data/agay_bay/model.t7",
-        "name": "Agay Bay"
-    }
+#    "agay_bay": {
+#        "original": "agay-bay-1910.jpg",
+#        "annotation": "agay-bay-1910-mask.jpegg",
+#        "colors": "data/agay_bay/gen_doodles.hdf5_colors.npy",
+#        "model": "data/agay_bay/model.t7",
+#        "name": "Agay Bay"
+#    }
 }
 
 
@@ -65,7 +65,9 @@ client = Client()
 
 @oauth.clientgetter
 def load_client(client_id):
-    return client
+    if client_id == CLIENT_ID:
+        return client
+    return None
 
 
 @oauth.grantgetter
