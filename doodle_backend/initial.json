@@ -1,0 +1,16 @@
+{
+  "monet": {
+    "original": "monet.jpg",
+    "annotation": "monet_mask.jpg",
+    "colors": "data/monet/gen_doodles.hdf5_colors.npy",
+    "model": "data/monet/model.t7",
+    "name": "Monet"
+  },
+  "van_gogh": {
+    "original": "van_gogh.png",
+    "annotation": "van_gogh_mask.png",
+    "colors": "pretrained/gen_doodles.hdf5colors.npy",
+    "model": "pretrained/starry_night.t7",
+    "name": "Van Gogh"
+  }
+}

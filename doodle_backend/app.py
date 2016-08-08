@@ -1,6 +1,7 @@
 from gevent import monkey
 monkey.patch_all()
 import os
+import json
 import uuid
 import flask
 import datetime
@@ -11,7 +12,7 @@ from .tasks import *
 from flask_oauthlib.provider import OAuth2Provider
 
 redis_host = os.environ.get("REDIS_HOST", "localhost")
-redis_client = Redis(redis_host)
+redis_client = Redis(redis_host, decode_responses=True)
 
 app = flask.Flask(__name__)
 app.config["OAUTH2_PROVIDER_TOKEN_EXPIRES_IN"] = 3600000
@@ -20,36 +21,29 @@ oauth = OAuth2Provider(app)
 cwd = os.path.abspath(os.path.dirname(__file__))
 SAMPLES_FOLDER = os.path.join(cwd, "../online_doodle_files")
 
-# allow requests only with this token provided
-
-# we need to keep styles somewhere
-# in local json file?
 
 CLIENT_ID = os.environ.get("CLIENT_ID") or "some_client_id"
 
-STYLES = {
-    "monet": {
-        "original": "monet.jpg",
-        "annotation": "monet_mask.jpg",
-        "colors": "data/monet/gen_doodles.hdf5_colors.npy",
-        "model": "data/monet/model.t7",
-        "name": "Monet"
-    },
-    "van_gogh": {
-        "original": "van_gogh.png",
-        "annotation": "van_gogh_mask.png",
-        "colors": "pretrained/gen_doodles.hdf5colors.npy",
-        "model": "pretrained/starry_night.t7",
-        "name": "Van Gogh"
-    },
-#    "agay_bay": {
-#        "original": "agay-bay-1910.jpg",
-#        "annotation": "agay-bay-1910-mask.jpegg",
-#        "colors": "data/agay_bay/gen_doodles.hdf5_colors.npy",
-#        "model": "data/agay_bay/model.t7",
-#        "name": "Agay Bay"
-#    }
-}
+STYLES_KEY = "doodle_styles"
+
+
+def get_style_data():
+    global STYLES
+    if redis_client.exists(STYLES_KEY):
+        result = {}
+        styles = redis_client.lrange(STYLES_KEY, 0, -1)
+        for style in styles:
+            result[style] = redis_client.hgetall(style)
+        return result
+    else:
+        with open(os.path.join(cwd, "initial.json")) as initial:
+            result = json.load(initial)
+            styles = []
+            for key, value in result.items():
+                styles.append(key)
+                redis_client.hmset(key, value)
+            redis_client.lpush(STYLES_KEY, *styles)
+            return result
 
 
 class Client:
@@ -89,13 +83,10 @@ class Token:
 
 @oauth.tokengetter
 def load_token(access_token=None, refresh_token=None):
-    print("getting token")
-    print(access_token)
     result = redis_client.hgetall(access_token)
-    print(result)
     if result:
-        expires = datetime.datetime.strptime(result[b"expires"].decode(), "%Y-%m-%d %H:%M:%S.%f")
-        client_id = result[b"client_id"]
+        expires = datetime.datetime.strptime(result["expires"], "%Y-%m-%d %H:%M:%S.%f")
+        client_id = result["client_id"]
         return Token(client_id=client_id, expires=expires)
     return None
 
@@ -119,7 +110,7 @@ def access_token():
 @oauth.require_oauth('default')
 def list_styles():
     result = []
-    for key, value in STYLES.items():
+    for key, value in get_style_data().items():
         result.append({
             "key": key,
             "name": value["name"],
@@ -131,7 +122,7 @@ def list_styles():
 @app.route('/picture/<style>.png')
 def original_picture(style):
     return flask.send_from_directory(SAMPLES_FOLDER,
-                                     STYLES[style]["original"])
+                                     get_style_data()[style]["original"])
 
 
 @app.route('/result/<filename>')
@@ -149,8 +140,44 @@ def process_handler():
             uid = str(uuid.uuid4())
             filename = uid + "_mask.png"
             file.save(os.path.join(SAMPLES_FOLDER, filename))
-            style_data = STYLES[style]
+            style_data = get_style_data()[style]
             result = process_image.delay(uid, style_data["colors"], style_data["model"])
             result.get()
             return flask.jsonify(uid=uid, result_url=flask.url_for('result', filename="{}.png".format(uid)))
     flask.abort(400)
+
+
+@app.route("/admin/newstyle", methods=["GET", "POST"])
+def add_newstyle():
+    if flask.request.method == "GET":
+        return flask.render_template("add_style.html")
+    else:
+        try:
+            original = flask.request.files["original"]
+            mask = flask.request.files["mask"]
+            name = flask.request.form["name"]
+            key = flask.request.form["key"]
+        except Exception:
+            flask.abort(400, "Some fields are missing")
+            return
+        if redis_client.exists(key):
+            flask.abort(409, "'{}' already used".format(key))
+            return
+        original_filename = key + ".png"
+        mask_filename = key + "_mask.png"
+        original.save(os.path.join(SAMPLES_FOLDER, original_filename))
+        mask.save(os.path.join(SAMPLES_FOLDER, mask_filename))
+        result = train_image.delay(original_filename, mask_filename, key, name)
+        return flask.redirect(flask.url_for('style_status', task_id=result.id))
+
+
+@app.route("/admin/style_status/<task_id>")
+def style_status(task_id):
+    from celery.result import AsyncResult
+    result = AsyncResult(task_id)
+    if result.successful():
+        return "Ready"
+    elif result.failed():
+        return "Error, {}".format(result.result)
+    else:
+        return "Pending"
