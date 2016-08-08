@@ -43,7 +43,7 @@ def process_image(item_id, colors, model):
 
 @app.task
 def train_image(image, mask, key, name):
-    subprocess.check_call(["sudo", "mkdir", "/mnt/process"])
+    subprocess.check_call(["sudo", "mkdir", "-p", "/mnt/process"])
     subprocess.check_call(["sudo", "chown", "ubuntu", "/mnt/process"])
     subprocess.check_call(["nvidia-docker", "run", "--rm",
                            "-v", "/data/mounted/models/:/root/data",
