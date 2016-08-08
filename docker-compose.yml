@@ -11,6 +11,7 @@ services:
       - RABBIT_URL=amqp://guest@queue//
     volumes:
       - /data/mounted/online_doodle_files:/usr/src/app/online_doodle_files
+      - /data/mounted/models:/usr/src/app/models
   queue:
     image: rabbitmq
     restart: always

@@ -21,6 +21,8 @@ oauth = OAuth2Provider(app)
 cwd = os.path.abspath(os.path.dirname(__file__))
 SAMPLES_FOLDER = os.path.join(cwd, "../online_doodle_files")
 
+MODELS_FOLDER = os.path.join(cwd, "../models")
+
 
 CLIENT_ID = os.environ.get("CLIENT_ID") or "some_client_id"
 
@@ -165,8 +167,8 @@ def add_newstyle():
             return
         original_filename = key + ".png"
         mask_filename = key + "_mask.png"
-        original.save(os.path.join(SAMPLES_FOLDER, original_filename))
-        mask.save(os.path.join(SAMPLES_FOLDER, mask_filename))
+        original.save(os.path.join(MODELS_FOLDER, original_filename))
+        mask.save(os.path.join(MODELS_FOLDER, mask_filename))
         result = train_image.delay(original_filename, mask_filename, key, name)
         return flask.redirect(flask.url_for('style_status', task_id=result.id))
 

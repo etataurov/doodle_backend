@@ -43,15 +43,16 @@ def process_image(item_id, colors, model):
 
 @app.task
 def train_image(image, mask, key, name):
-    subprocess.check_call(["nvidia-docker", "run", "--rm", "-v",
-                     "/data/mounted/models/:/root/data",
-                     "-v",
-                     "/data/mounted/online_doodle_files:/root/doodle/",
-                     "train_network", key])
+    subprocess.check_call(["sudo", "mkdir", "/mnt/process"])
+    subprocess.check_call(["sudo", "chown", "ubuntu", "/mnt/process"])
+    subprocess.check_call(["nvidia-docker", "run", "--rm",
+                           "-v", "/data/mounted/models/:/root/data",
+                           "-v", "/mnt/process:/root/process/",
+                           "train_network", key])
     redis_client.rpush("doodle_styles", key)
     redis_client.hmset(key, {"original": image,
                              "annotation": mask,
-                             "colors": "data/monet/gen_doodles.hdf5_colors.npy",
-                             "model": "data/monet/model.t7",
+                             "colors": "{}_gen_doodles.hdf5_colors.npy".format(key),
+                             "model": "{}_model.t7".format(key),
                              "name": name})
     return "ok"
