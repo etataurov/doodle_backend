@@ -7,7 +7,7 @@ import flask
 import datetime
 
 from redis import Redis
-from .tasks import *
+from .tasks import process_image, train_image, app as celery_app
 
 from flask_oauthlib.provider import OAuth2Provider
 
@@ -175,8 +175,7 @@ def add_newstyle():
 
 @app.route("/admin/style_status/<task_id>")
 def style_status(task_id):
-    from celery.result import AsyncResult
-    result = AsyncResult(task_id)
+    result = celery_app.AsyncResult(task_id)
     if result.successful():
         return "Ready"
     elif result.failed():

@@ -1,3 +1,4 @@
+#!/bin/sh
 STYLE=$0
 DATA_DIR="/root/data/"
 STYLE_IMAGE="$DATA_DIR/$STYLE.png"
